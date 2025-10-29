@@ -1,0 +1,23 @@
+/* Optional: apply globally */
+body {
+  background-color: var(--background-color);
+  color: #000;
+}
+
+a, button {
+  color: var(--primary-color);
+}
+
+button {
+  background-color: var(--primary-color);
+  border: none;
+  border-radius: 5px;
+  padding: 8px 12px;
+  color: white;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+button:hover {
+  background-color: var(--primary-dark);
+}

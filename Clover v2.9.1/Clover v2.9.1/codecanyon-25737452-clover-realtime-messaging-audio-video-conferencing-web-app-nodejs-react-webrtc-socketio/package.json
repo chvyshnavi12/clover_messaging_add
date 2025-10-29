@@ -1,0 +1,13 @@
+{
+  "name": "clover",
+  "author": "Honeyside",
+  "version": "2.9.1",
+  "private": true,
+  "engines": {
+    "node": "18.x.x"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
