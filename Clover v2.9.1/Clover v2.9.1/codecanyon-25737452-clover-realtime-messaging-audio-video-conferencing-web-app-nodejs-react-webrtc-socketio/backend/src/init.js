@@ -78,7 +78,25 @@ module.exports = () => {
     });
 
   // Express middlewares
-  store.app.use(cors());
+const allowedOrigins = [
+  "https://clovermsg.netlify.app", // your deployed frontend
+  "http://localhost:5173",         // optional for local dev
+];
+
+store.app.use(
+  cors({
+    origin: function (origin, callback) {
+      // allow requests with no origin (like mobile apps, curl, etc.)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) === -1) {
+        const msg = "CORS policy: This origin is not allowed -> " + origin;
+        return callback(new Error(msg), false);
+      }
+      return callback(null, true);
+    },
+    credentials: true,
+  })
+);
   store.app.use(formidableMiddleware());
   store.app.use(passport.initialize());
 
