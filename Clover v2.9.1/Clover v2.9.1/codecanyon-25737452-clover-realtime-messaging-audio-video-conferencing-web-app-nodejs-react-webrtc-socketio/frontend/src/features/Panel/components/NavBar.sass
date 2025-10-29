@@ -2,7 +2,8 @@
   width: calc(100% - 18px)
   padding: 0 9px
   height: 44px
-  border-bottom: 1px solid #dadce0
+  border-bottom: 1px solid #1e70ff    // blue border
+  background: #0d4bb3                 // optional dark blue background
   .item
     display: flex
     flex-direction: column
@@ -10,7 +11,7 @@
     align-items: center
     width: 25%
     cursor: pointer
-    color: #666
+    color: #cce0ff                    // light blue text
     .icon
       font-size: 18px
       margin-top: -2px
@@ -18,4 +19,6 @@
     .text
       font-size: 9px
   .item:hover
-    color: #000
+    color: #ffffff                     // white text on hover for contrast
+  .item.active
+    color: #1e70ff                     // strong blue for active item

@@ -4,39 +4,67 @@
   right: 0
   bottom: 0
   left: 0
-  background: rgba(0,0,0,0.7)
+  background: rgba(0, 36, 102, 0.8)   // dark blue overlay
   z-index: 2000
   display: flex
   justify-content: center
   align-items: center
+
   .notice
-    color: #666
+    color: #cce0ff                     // light blue text
     font-size: 13px
     padding-top: 14px
+    text-align: center
+
   .box
     width: 400px
     max-height: 90vh
     max-width: 90vw
-    background: #f7f7f7
+    background: #1e70ff                // bright blue modal background
+    border-radius: 12px
+    box-shadow: 0 6px 20px rgba(0, 0, 102, 0.5)
     display: flex
     flex-direction: column
+    color: white                        // default text white for contrast
+
     .top-controls
       padding: 14px 20px
       display: flex
       flex-direction: row
       justify-content: space-between
       align-items: center
+      border-bottom: 1px solid rgba(255,255,255,0.3)
+
       .title
         font-weight: bold
+        font-size: 16px
+
       .close
         font-size: 24px
         cursor: pointer
+        color: #ffcccb                 // soft red for close button
+        transition: color 0.2s ease
+        &:hover
+          color: #ff4444
+
   .data-editor
     overflow-y: scroll
     padding: 12px 20px
     .padding
       height: 12px
-  .admin-form-error
-    color: #DA1102
-    font-size: 13px
+    input, select, textarea
+      background: #cce0ff
+      border: 1px solid #1e70ff
+      color: #0d1b2a
+      border-radius: 6px
+      padding: 8px
+      width: 100%
+      margin-bottom: 10px
+      &:focus
+        outline: none
+        border-color: #0d47a1
+        box-shadow: 0 0 5px rgba(13,71,161,0.5)
 
+  .admin-form-error
+    color: #ff4444                      // keep errors red for clarity
+    font-size: 13px
