@@ -19,84 +19,30 @@ module.exports = () => {
   store.peers = new AsyncNedb();
   store.onlineUsers = new Map();
 
-  // Socket.io authentication setup
-  store.io.sockets
-    .on(
-      'connection',
-      socketioJwt.authorize({
-        secret: store.config.secret,
-        timeout: 15000, // 15 seconds to send the authentication message
-      }),
-    )
-    .on('authenticated', (socket) => {
-      const { email, id } = socket.decoded_token;
-      console.log(`Socket connected: ${email}`.cyan);
+  // ✅ CORS Configuration (Fixed)
+  const allowedOrigins = [
+    "https://clovermsg.netlify.app", // frontend
+    "http://localhost:5173",         // local dev
+  ];
 
-      mediasoup.initSocket(socket);
-      socket.join(id);
-
-      events.forEach((event) => socket.on(event.tag, (data) => event.callback(socket, data)));
-
-      // Store socket info
-      store.socketIds.push(socket.id);
-      store.sockets[socket.id] = socket;
-      if (!store.socketsByUserID[id]) store.socketsByUserID[id] = [];
-      store.socketsByUserID[id].push(socket);
-      store.userIDsBySocketID[socket.id] = id;
-
-      // Track online users
-      store.onlineUsers.set(socket, { id, status: 'online' });
-      store.io.emit('onlineUsers', Array.from(store.onlineUsers.values()));
-
-      // Handle disconnects
-      socket.on('disconnect', () => {
-        if (store.roomIDs[socket.id]) {
-          let roomID = store.roomIDs[socket.id];
-          store.consumerUserIDs[roomID].splice(store.consumerUserIDs[roomID].indexOf(socket.id), 1);
-          socket.to(roomID).emit('consumers', { content: store.consumerUserIDs[roomID], timestamp: Date.now() });
-          socket.to(roomID).emit('leave', { socketID: socket.id });
+  store.app.use(
+    cors({
+      origin: (origin, callback) => {
+        if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
+          callback(null, true);
+        } else {
+          console.warn("🚫 Blocked by CORS:", origin);
+          callback(null, false);
         }
+      },
+      credentials: true,
+    })
+  );
 
-        Meeting.update({}, { $pull: { peers: socket.id } }, { multi: true });
-
-        store.peers.remove({ socketID: socket.id }, { multi: true });
-        console.log(`Socket disconnected: ${email}`.cyan);
-
-        store.socketIds.splice(store.socketIds.indexOf(socket.id), 1);
-        store.sockets[socket.id] = undefined;
-
-        const removeSocket = (array, element) => array.filter((s) => s.id !== element.id);
-        store.socketsByUserID[id] = removeSocket(store.socketsByUserID[id], socket);
-
-        User.findOneAndUpdate({ _id: id }, { $set: { lastOnline: Date.now() } })
-          .then(() => console.log('Last online updated: ' + id))
-          .catch((err) => console.log(err));
-
-        store.onlineUsers.delete(socket);
-        store.io.emit('onlineUsers', Array.from(store.onlineUsers.values()));
-      });
-    });
+  // ✅ Allow preflight requests globally
+  store.app.options("*", cors());
 
   // Express middlewares
-const allowedOrigins = [
-  "https://clovermsg.netlify.app", // your deployed frontend
-  "http://localhost:5173",         // optional for local dev
-];
-
-store.app.use(
-  cors({
-    origin: function (origin, callback) {
-      // allow requests with no origin (like mobile apps, curl, etc.)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.indexOf(origin) === -1) {
-        const msg = "CORS policy: This origin is not allowed -> " + origin;
-        return callback(new Error(msg), false);
-      }
-      return callback(null, true);
-    },
-    credentials: true,
-  })
-);
   store.app.use(formidableMiddleware());
   store.app.use(passport.initialize());
 
@@ -118,54 +64,124 @@ store.app.use(
 
   store.app.use('/api', router);
 
-  // MongoDB connection
-  const mongooseConnect = async () => {
-  console.log("🟡 Connecting to MongoDB...");
+  // Socket.io authentication setup
+  store.io.sockets
+    .on(
+      'connection',
+      socketioJwt.authorize({
+        secret: store.config.secret,
+        timeout: 15000, // 15 seconds to send the authentication message
+      }),
+    )
+    .on('authenticated', (socket) => {
+      const { email, id } = socket.decoded_token;
+      console.log(`Socket connected: ${email}`.cyan);
 
-  const uri = process.env.MONGO_URI;
-  if (!uri) {
-    console.error("❌ Missing MONGO_URI in .env file");
-    return;
-  }
+      mediasoup.initSocket(socket);
+      socket.join(id);
 
-  mongoose.set('strictQuery', false);
+      events.forEach((event) =>
+        socket.on(event.tag, (data) => event.callback(socket, data))
+      );
 
-  try {
-    await mongoose.connect(uri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+      // Store socket info
+      store.socketIds.push(socket.id);
+      store.sockets[socket.id] = socket;
+      if (!store.socketsByUserID[id]) store.socketsByUserID[id] = [];
+      store.socketsByUserID[id].push(socket);
+      store.userIDsBySocketID[socket.id] = id;
+
+      // Track online users
+      store.onlineUsers.set(socket, { id, status: 'online' });
+      store.io.emit('onlineUsers', Array.from(store.onlineUsers.values()));
+
+      // Handle disconnects
+      socket.on('disconnect', () => {
+        if (store.roomIDs[socket.id]) {
+          let roomID = store.roomIDs[socket.id];
+          store.consumerUserIDs[roomID].splice(
+            store.consumerUserIDs[roomID].indexOf(socket.id),
+            1
+          );
+          socket.to(roomID).emit('consumers', {
+            content: store.consumerUserIDs[roomID],
+            timestamp: Date.now(),
+          });
+          socket.to(roomID).emit('leave', { socketID: socket.id });
+        }
+
+        Meeting.update({}, { $pull: { peers: socket.id } }, { multi: true });
+        store.peers.remove({ socketID: socket.id }, { multi: true });
+
+        console.log(`Socket disconnected: ${email}`.cyan);
+
+        store.socketIds.splice(store.socketIds.indexOf(socket.id), 1);
+        store.sockets[socket.id] = undefined;
+
+        const removeSocket = (array, element) =>
+          array.filter((s) => s.id !== element.id);
+        store.socketsByUserID[id] = removeSocket(store.socketsByUserID[id], socket);
+
+        User.findOneAndUpdate({ _id: id }, { $set: { lastOnline: Date.now() } })
+          .then(() => console.log('Last online updated: ' + id))
+          .catch((err) => console.log(err));
+
+        store.onlineUsers.delete(socket);
+        store.io.emit('onlineUsers', Array.from(store.onlineUsers.values()));
+      });
     });
-    console.log("✅ Connected to MongoDB");
 
-    const { ROOT_USER_USERNAME, ROOT_USER_EMAIL, ROOT_USER_PASSWORD, ROOT_USER_FIRST_NAME, ROOT_USER_LAST_NAME } =
-      process.env;
+  // ✅ MongoDB connection
+  const mongooseConnect = async () => {
+    console.log("🟡 Connecting to MongoDB...");
 
-    const existingUser = await User.findOne({ email: ROOT_USER_EMAIL });
-    const hash = await argon2.hash(ROOT_USER_PASSWORD);
-
-    if (!existingUser) {
-      await new User({
-        username: ROOT_USER_USERNAME,
-        email: ROOT_USER_EMAIL,
-        password: hash,
-        firstName: ROOT_USER_FIRST_NAME,
-        lastName: ROOT_USER_LAST_NAME,
-        level: 'root',
-      }).save();
-      console.log("🆕 Root user created");
-    } else {
-      console.log("ℹ️ Root user already exists");
+    const uri = process.env.MONGO_URI;
+    if (!uri) {
+      console.error("❌ Missing MONGO_URI in .env file");
+      return;
     }
 
-    await Meeting.updateMany({}, { $set: { peers: [] } });
-  } catch (err) {
-    console.error("❌ MongoDB connection error:", err.message);
-    console.log("Retrying in 10 seconds...");
-    setTimeout(mongooseConnect, 10 * 1000);
-  }
-};
+    mongoose.set('strictQuery', false);
 
+    try {
+      await mongoose.connect(uri, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+      });
+      console.log("✅ Connected to MongoDB");
 
+      const {
+        ROOT_USER_USERNAME,
+        ROOT_USER_EMAIL,
+        ROOT_USER_PASSWORD,
+        ROOT_USER_FIRST_NAME,
+        ROOT_USER_LAST_NAME,
+      } = process.env;
+
+      const existingUser = await User.findOne({ email: ROOT_USER_EMAIL });
+      const hash = await argon2.hash(ROOT_USER_PASSWORD);
+
+      if (!existingUser) {
+        await new User({
+          username: ROOT_USER_USERNAME,
+          email: ROOT_USER_EMAIL,
+          password: hash,
+          firstName: ROOT_USER_FIRST_NAME,
+          lastName: ROOT_USER_LAST_NAME,
+          level: 'root',
+        }).save();
+        console.log("🆕 Root user created");
+      } else {
+        console.log("ℹ️ Root user already exists");
+      }
+
+      await Meeting.updateMany({}, { $set: { peers: [] } });
+    } catch (err) {
+      console.error("❌ MongoDB connection error:", err.message);
+      console.log("Retrying in 10 seconds...");
+      setTimeout(mongooseConnect, 10 * 1000);
+    }
+  };
 
   mongooseConnect();
 };
